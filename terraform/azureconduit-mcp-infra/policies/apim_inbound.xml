@@ -1,0 +1,112 @@
+<policies>
+  <inbound>
+    <!-- CORS Policy for Claude.ai -->
+    <cors allow-credentials="true">
+      <allowed-origins>
+        <origin>https://claude.ai</origin>
+      </allowed-origins>
+      <allowed-methods preflight-result-max-age="300">
+        <method>GET</method>
+        <method>POST</method>
+        <method>PUT</method>
+        <method>DELETE</method>
+        <method>PATCH</method>
+        <method>OPTIONS</method>
+      </allowed-methods>
+      <allowed-headers>
+        <header>*</header>
+      </allowed-headers>
+      <expose-headers>
+        <header>*</header>
+      </expose-headers>
+    </cors>
+
+    <!-- Validate Entra ID JWT token -->
+    <validate-azure-ad-token tenant-id="${tenant_id}">
+      <client-application-ids>
+        <application-id>${app_client_id}</application-id>
+      </client-application-ids>
+      <audiences>
+        <audience>api://azureconduit-mcp-*</audience>
+      </audiences>
+      <required-claims>
+        <claim name="aud" match="any">
+          <value>api://azureconduit-mcp-*</value>
+        </claim>
+      </required-claims>
+    </validate-azure-ad-token>
+
+    <!-- Extract user context from the validated token -->
+    <set-variable name="user-principal-name" value="@(context.Request.Headers.GetValueOrDefault("Authorization","").Split(' ').Last())" />
+
+    <!-- Store original caller identity for audit -->
+    <set-header name="X-Original-Authorization" exists-action="override">
+      <value>@(context.Request.Headers.GetValueOrDefault("Authorization",""))</value>
+    </set-header>
+
+    <!-- Strip the incoming Authorization header -->
+    <set-header name="Authorization" exists-action="delete" />
+
+    <!-- Get managed identity token for backend -->
+    <authentication-managed-identity resource="https://management.azure.com/" client-id="${managed_identity_id}" output-token-variable-name="msi-access-token" ignore-error="false" />
+
+    <!-- Set backend Authorization header with managed identity token -->
+    <set-header name="Authorization" exists-action="override">
+      <value>@("Bearer " + (string)context.Variables["msi-access-token"])</value>
+    </set-header>
+
+    <!-- Forward user identity to backend -->
+    <set-header name="X-MS-CLIENT-PRINCIPAL-NAME" exists-action="override">
+      <value>@{
+        var authHeader = context.Request.Headers.GetValueOrDefault("X-Original-Authorization","");
+        if (string.IsNullOrEmpty(authHeader)) return "";
+        try {
+          var token = authHeader.Split(' ').Last();
+          var parts = token.Split('.');
+          if (parts.Length != 3) return "";
+          var payload = parts[1];
+          var padded = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+          var decoded = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(padded));
+          var json = Newtonsoft.Json.Linq.JObject.Parse(decoded);
+          return json["upn"]?.ToString() ?? json["email"]?.ToString() ?? "";
+        } catch {
+          return "";
+        }
+      }</value>
+    </set-header>
+
+    <base />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <!-- Return 401 with clear error message for auth failures -->
+    <choose>
+      <when condition="@(context.LastError.Source == "validate-azure-ad-token")">
+        <return-response>
+          <set-status code="401" reason="Unauthorized" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-header name="WWW-Authenticate" exists-action="override">
+            <value>Bearer realm="AzureConduit MCP", error="invalid_token", error_description="The access token is missing, invalid, or expired"</value>
+          </set-header>
+          <set-body>@{
+            return new Newtonsoft.Json.Linq.JObject(
+              new Newtonsoft.Json.Linq.JProperty("error", "unauthorized"),
+              new Newtonsoft.Json.Linq.JProperty("error_description", "Authentication failed. Please provide a valid Entra ID access token."),
+              new Newtonsoft.Json.Linq.JProperty("details", context.LastError.Message)
+            ).ToString();
+          }</set-body>
+        </return-response>
+      </when>
+      <otherwise>
+        <base />
+      </otherwise>
+    </choose>
+  </on-error>
+</policies>

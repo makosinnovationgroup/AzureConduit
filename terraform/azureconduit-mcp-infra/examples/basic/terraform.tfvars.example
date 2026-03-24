@@ -1,0 +1,60 @@
+# Example terraform.tfvars for AzureConduit MCP deployment
+# Copy this file to terraform.tfvars and fill in your values
+
+# Required: Client identifier (lowercase alphanumeric only)
+client_name = "acmecorp"
+
+# Required: Azure region
+location = "eastus"
+
+# Required: Your Entra (Azure AD) tenant ID
+tenant_id = "00000000-0000-0000-0000-000000000000"
+
+# Required: Your Azure subscription ID
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# Required: Claude.ai MCP client application ID
+# Get this from your Claude Team/Enterprise admin console
+claude_client_id = "00000000-0000-0000-0000-000000000000"
+
+# Required: Entra group ID for admin access
+# Members of this group will have full access to manage the deployment
+entra_admin_group_id = "00000000-0000-0000-0000-000000000000"
+
+# Required for container_apps/app_service: MCP server container image
+# This is YOUR custom MCP server image - there is no default.
+# Examples:
+#   - "myregistry.azurecr.io/mcp-server:v1.0"     (private ACR)
+#   - "ghcr.io/your-org/mcp-server:latest"        (GitHub Container Registry)
+# Not needed for compute_type = "functions" (Functions deploy code, not images)
+mcp_image = "your-registry/your-mcp-server:tag"
+
+# Compute type - choose one:
+#   "container_apps" - Recommended for production (scale to zero, ~$15-50/mo)
+#   "functions"      - Cheapest for pilots (~$10-20/mo, but 10-30s cold starts)
+#   "app_service"    - Simplest auth, always-on (~$75-100/mo, no cold starts)
+compute_type = "container_apps"
+
+# Optional: APIM pricing tier
+# Options: "Consumption" (default, pay-per-call), "Developer", "Standard"
+apim_tier = "Consumption"
+
+# Optional: Use private Azure Container Registry
+# Set to true if you need to use a private container image
+use_acr = false
+
+# Optional: Azure resource IDs to grant the MCP server access to
+# The managed identity will be assigned the role specified in target_resource_role
+target_resource_ids = [
+  # "/subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.Storage/storageAccounts/xxx",
+]
+
+# Optional: Role to assign on target resources
+# Default is "Reader" for read-only access
+target_resource_role = "Reader"
+
+# Optional: Additional tags for all resources
+tags = {
+  environment = "production"
+  department  = "engineering"
+}

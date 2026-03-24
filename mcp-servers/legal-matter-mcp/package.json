@@ -1,0 +1,31 @@
+{
+  "name": "legal-matter-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for legal practice management - matters, time tracking, billing, and documents",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc && node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "axios": "^1.6.0",
+    "express": "^4.18.2",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "keywords": [
+    "mcp",
+    "legal",
+    "matter-management",
+    "clio",
+    "practice-panther",
+    "time-billing",
+    "law-firm"
+  ]
+}

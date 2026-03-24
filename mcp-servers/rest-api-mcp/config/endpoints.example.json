@@ -1,0 +1,214 @@
+{
+  "version": "1.0.0",
+  "endpoints": [
+    {
+      "name": "list_users",
+      "description": "Get a list of all users",
+      "method": "GET",
+      "path": "/users",
+      "parameters": [
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "number",
+          "description": "Page number for pagination",
+          "default": 1
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "number",
+          "description": "Number of results per page",
+          "default": 10
+        }
+      ]
+    },
+    {
+      "name": "get_user",
+      "description": "Get a specific user by ID",
+      "method": "GET",
+      "path": "/users/{id}",
+      "parameters": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "description": "The user ID"
+        }
+      ]
+    },
+    {
+      "name": "create_user",
+      "description": "Create a new user",
+      "method": "POST",
+      "path": "/users",
+      "parameters": [
+        {
+          "name": "name",
+          "location": "body",
+          "required": true,
+          "type": "string",
+          "description": "The user's name"
+        },
+        {
+          "name": "email",
+          "location": "body",
+          "required": true,
+          "type": "string",
+          "description": "The user's email address"
+        }
+      ]
+    },
+    {
+      "name": "update_user",
+      "description": "Update an existing user",
+      "method": "PUT",
+      "path": "/users/{id}",
+      "parameters": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "description": "The user ID"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": false,
+          "type": "string",
+          "description": "The user's name"
+        },
+        {
+          "name": "email",
+          "location": "body",
+          "required": false,
+          "type": "string",
+          "description": "The user's email address"
+        }
+      ]
+    },
+    {
+      "name": "delete_user",
+      "description": "Delete a user",
+      "method": "DELETE",
+      "path": "/users/{id}",
+      "parameters": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "description": "The user ID"
+        }
+      ]
+    },
+    {
+      "name": "search_items",
+      "description": "Search for items with various filters",
+      "method": "GET",
+      "path": "/items/search",
+      "parameters": [
+        {
+          "name": "q",
+          "location": "query",
+          "required": true,
+          "type": "string",
+          "description": "Search query"
+        },
+        {
+          "name": "category",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "description": "Filter by category"
+        },
+        {
+          "name": "min_price",
+          "location": "query",
+          "required": false,
+          "type": "number",
+          "description": "Minimum price filter"
+        },
+        {
+          "name": "max_price",
+          "location": "query",
+          "required": false,
+          "type": "number",
+          "description": "Maximum price filter"
+        },
+        {
+          "name": "sort",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "description": "Sort order (price_asc, price_desc, name_asc, name_desc)"
+        }
+      ]
+    },
+    {
+      "name": "get_item_details",
+      "description": "Get detailed information about an item",
+      "method": "GET",
+      "path": "/items/{category}/{id}",
+      "parameters": [
+        {
+          "name": "category",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "description": "The item category"
+        },
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "description": "The item ID"
+        },
+        {
+          "name": "include_reviews",
+          "location": "query",
+          "required": false,
+          "type": "boolean",
+          "description": "Include customer reviews"
+        }
+      ]
+    },
+    {
+      "name": "submit_order",
+      "description": "Submit a new order",
+      "method": "POST",
+      "path": "/orders",
+      "parameters": [
+        {
+          "name": "items",
+          "location": "body",
+          "required": true,
+          "type": "array",
+          "description": "Array of item objects with id and quantity"
+        },
+        {
+          "name": "shipping_address",
+          "location": "body",
+          "required": true,
+          "type": "object",
+          "description": "Shipping address object"
+        },
+        {
+          "name": "payment_method",
+          "location": "body",
+          "required": true,
+          "type": "string",
+          "description": "Payment method identifier"
+        }
+      ],
+      "headers": {
+        "X-Idempotency-Key": "unique-request-id"
+      }
+    }
+  ]
+}
