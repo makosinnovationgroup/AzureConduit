@@ -53,13 +53,13 @@ resource "azurerm_linux_web_app" "mcp" {
   }
 
   app_settings = {
-    "AZURE_CLIENT_ID"                             = azurerm_user_assigned_identity.mcp.client_id
-    "AZURE_TENANT_ID"                             = var.tenant_id
-    "PORT"                                        = "8000"
-    "WEBSITES_PORT"                               = "8000"
-    "DOCKER_REGISTRY_SERVER_URL"                  = var.use_acr ? "https://${azurerm_container_registry.main[0].login_server}" : null
-    "WEBSITES_ENABLE_APP_SERVICE_STORAGE"         = "false"
-    "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"    = azuread_application_password.mcp[0].value
+    "AZURE_CLIENT_ID"                          = azurerm_user_assigned_identity.mcp.client_id
+    "AZURE_TENANT_ID"                          = var.tenant_id
+    "PORT"                                     = "8000"
+    "WEBSITES_PORT"                            = "8000"
+    "DOCKER_REGISTRY_SERVER_URL"               = var.use_acr ? "https://${azurerm_container_registry.main[0].login_server}" : null
+    "WEBSITES_ENABLE_APP_SERVICE_STORAGE"      = "false"
+    "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET" = azuread_application_password.mcp[0].value
   }
 
   https_only = true

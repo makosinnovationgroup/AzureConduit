@@ -52,3 +52,20 @@ output "tenant_id" {
   description = "Entra tenant ID"
   value       = var.tenant_id
 }
+
+output "log_analytics_workspace_id" {
+  description = "Log Analytics Workspace ID for querying logs"
+  value       = azurerm_log_analytics_workspace.main.id
+}
+
+output "application_insights_connection_string" {
+  description = "Application Insights connection string for APIM telemetry"
+  value       = azurerm_application_insights.apim.connection_string
+  sensitive   = true
+}
+
+output "application_insights_instrumentation_key" {
+  description = "Application Insights instrumentation key"
+  value       = azurerm_application_insights.apim.instrumentation_key
+  sensitive   = true
+}

@@ -51,11 +51,11 @@ resource "azurerm_linux_function_app" "mcp" {
   }
 
   app_settings = {
-    "AZURE_CLIENT_ID"                      = azurerm_user_assigned_identity.mcp.client_id
-    "AZURE_TENANT_ID"                      = var.tenant_id
-    "FUNCTIONS_WORKER_RUNTIME"             = "custom"
-    "WEBSITE_RUN_FROM_PACKAGE"             = "1"
-    "SCM_DO_BUILD_DURING_DEPLOYMENT"       = "false"
+    "AZURE_CLIENT_ID"                       = azurerm_user_assigned_identity.mcp.client_id
+    "AZURE_TENANT_ID"                       = var.tenant_id
+    "FUNCTIONS_WORKER_RUNTIME"              = "custom"
+    "WEBSITE_RUN_FROM_PACKAGE"              = "1"
+    "SCM_DO_BUILD_DURING_DEPLOYMENT"        = "false"
     "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.functions[0].connection_string
   }
 

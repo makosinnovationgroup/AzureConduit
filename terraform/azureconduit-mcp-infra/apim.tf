@@ -116,8 +116,8 @@ resource "azurerm_api_management_api_policy" "mcp" {
   resource_group_name = azurerm_resource_group.main.name
 
   xml_content = templatefile("${path.module}/policies/apim_inbound.xml", {
-    tenant_id          = var.tenant_id
-    app_client_id      = azuread_application.mcp.client_id
+    tenant_id           = var.tenant_id
+    app_client_id       = azuread_application.mcp.client_id
     managed_identity_id = azurerm_user_assigned_identity.mcp.client_id
   })
 }
@@ -138,4 +138,103 @@ resource "azurerm_api_management_named_value" "app_client_id" {
   api_management_name = azurerm_api_management.main.name
   display_name        = "AppClientID"
   value               = azuread_application.mcp.client_id
+}
+
+# ------------------------------------------------------------------------------
+# APIM Diagnostic Settings - Send logs to Log Analytics
+# ------------------------------------------------------------------------------
+
+resource "azurerm_monitor_diagnostic_setting" "apim" {
+  name                       = "${local.name_prefix}-apim-diag"
+  target_resource_id         = azurerm_api_management.main.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+
+  # Gateway logs - captures all API requests/responses
+  enabled_log {
+    category = "GatewayLogs"
+  }
+
+  # WebSocket connection logs
+  enabled_log {
+    category = "WebSocketConnectionLogs"
+  }
+
+  # Metrics
+  enabled_metric {
+    category = "AllMetrics"
+  }
+}
+
+# Application Insights for APIM (optional but recommended for detailed tracing)
+resource "azurerm_application_insights" "apim" {
+  name                = "${local.name_prefix}-apim-ai-${local.name_suffix}"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  application_type    = "web"
+  workspace_id        = azurerm_log_analytics_workspace.main.id
+  tags                = local.common_tags
+}
+
+# Link Application Insights to APIM
+resource "azurerm_api_management_logger" "appinsights" {
+  name                = "appinsights-logger"
+  api_management_name = azurerm_api_management.main.name
+  resource_group_name = azurerm_resource_group.main.name
+  resource_id         = azurerm_application_insights.apim.id
+
+  application_insights {
+    instrumentation_key = azurerm_application_insights.apim.instrumentation_key
+  }
+}
+
+# API-level diagnostic settings for detailed request/response logging
+resource "azurerm_api_management_api_diagnostic" "mcp" {
+  identifier               = "applicationinsights"
+  resource_group_name      = azurerm_resource_group.main.name
+  api_management_name      = azurerm_api_management.main.name
+  api_name                 = azurerm_api_management_api.mcp.name
+  api_management_logger_id = azurerm_api_management_logger.appinsights.id
+
+  sampling_percentage = 100.0
+  always_log_errors   = true
+  log_client_ip       = true
+  verbosity           = "information"
+
+  # Log request details (exclude sensitive headers)
+  frontend_request {
+    body_bytes = 1024
+    headers_to_log = [
+      "Content-Type",
+      "Accept",
+      "X-Request-ID",
+      "X-Correlation-ID",
+    ]
+  }
+
+  # Log response details
+  frontend_response {
+    body_bytes = 1024
+    headers_to_log = [
+      "Content-Type",
+      "X-Request-ID",
+      "X-Correlation-ID",
+    ]
+  }
+
+  # Log backend request details
+  backend_request {
+    body_bytes = 1024
+    headers_to_log = [
+      "Content-Type",
+      "X-MS-CLIENT-PRINCIPAL-NAME",
+    ]
+  }
+
+  # Log backend response details
+  backend_response {
+    body_bytes = 1024
+    headers_to_log = [
+      "Content-Type",
+    ]
+  }
 }

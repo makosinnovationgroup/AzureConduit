@@ -70,22 +70,22 @@ resource "azurerm_container_app" "mcp" {
       }
 
       liveness_probe {
-        path             = "/health"
-        port             = 8000
-        transport        = "HTTP"
-        initial_delay    = 10
-        interval_seconds = 30
-        timeout          = 5
+        path                    = "/health"
+        port                    = 8000
+        transport               = "HTTP"
+        initial_delay           = 10
+        interval_seconds        = 30
+        timeout                 = 5
         failure_count_threshold = 3
       }
 
       readiness_probe {
-        path             = "/health"
-        port             = 8000
-        transport        = "HTTP"
-        initial_delay    = 5
-        interval_seconds = 10
-        timeout          = 3
+        path                    = "/health"
+        port                    = 8000
+        transport               = "HTTP"
+        initial_delay           = 5
+        interval_seconds        = 10
+        timeout                 = 3
         success_count_threshold = 1
         failure_count_threshold = 3
       }
