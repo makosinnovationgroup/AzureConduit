@@ -1,131 +1,214 @@
-# Option 1 — Cloud-Hosted Microsoft MCP Servers
+# Option 1 — Cloud-Hosted / Managed Connectors
 
-**No infrastructure. No Terraform. Just a URL.**
+**Minimal or zero infrastructure for Microsoft 365 access.**
 
-Several of Microsoft's first-party MCP servers are already deployed and running in Microsoft's cloud. For clients who only need access to these services, AzureConduit is purely a configuration exercise — no Azure resources to provision.
-
----
-
-## Available Cloud-Hosted Servers
-
-| MCP Server | Endpoint | What Users Can Ask |
-|---|---|---|
-| **M365 Calendar** | `https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_CalendarTools` | "What's on my calendar tomorrow?", "When is Sarah available?", "Schedule a meeting with the team" |
-| **M365 Mail** | `https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_MailTools` | "Summarize emails from Acme Corp", "Draft a reply to John's email", "Find emails about the Q4 budget" |
-| **M365 User** | `https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_UserTools` | "Who is my manager?", "Who reports to Sarah?", "What team is John on?" |
-| **M365 Copilot Chat** | `https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_SearchTools` | Search across M365: emails, SharePoint, Teams, OneDrive |
-| **Microsoft Foundry** | `https://mcp.ai.azure.com` | AI model deployments, evaluations, datasets |
-| **Microsoft Learn Docs** | `https://learn.microsoft.com/api/mcp` | Official Microsoft documentation (public, no auth) |
-| **GitHub** | `https://api.githubcopilot.com/mcp` | "Show open PRs in our repo", "What issues are assigned to me?" |
-| **Power Platform** | Environment-scoped URL | 1,470+ connector actions, Dataverse queries |
-
-*Endpoints may change — verify current URLs at [github.com/microsoft/mcp](https://github.com/microsoft/mcp)*
+For clients who only need access to M365 data (email, calendar, SharePoint, Teams, OneDrive), there are managed options that require little to no Azure infrastructure. This doc covers two sub-options with very different requirements.
 
 ---
 
-## What You Need
+## Option 1A: Anthropic's Microsoft 365 Connector (Recommended)
 
-- Client's **Entra Tenant ID** (for the tenant-scoped endpoints)
-- Client on **Claude Team or Enterprise plan** (admin access to configure integrations)
-- The relevant **Microsoft license** (M365, Power Platform, etc.)
-- No Azure subscription required for M365 endpoints
+**Zero infrastructure. Built into Claude. Just enable it.**
 
----
+Anthropic provides a pre-built Microsoft 365 integration that's already deployed and managed. You don't paste a URL — you enable a connector in Claude's settings.
 
-## Setup Steps
+### What It Accesses
 
-### 1. Get the endpoint URL
+| Service | Capabilities |
+|---------|-------------|
+| **SharePoint** | Search and analyze documents across sites |
+| **OneDrive** | Access files in user's personal OneDrive |
+| **Outlook** | Read email threads, analyze communication patterns |
+| **Teams** | Search chat conversations and channel discussions |
 
-For tenant-scoped servers, substitute the client's tenant ID into the URL:
-```
-https://agent365.svc.cloud.microsoft/agents/tenants/{TENANT_ID}/servers/mcp_CalendarTools
-```
+**Read-only access** — Claude cannot create, modify, or delete content.
 
-### 2. Register in Claude
+### Setup Steps
 
-1. Go to **claude.ai → Organization Settings → Integrations**
-2. Click **Add More**
-3. Paste the MCP endpoint URL
-4. Give it a friendly name (e.g. "Acme Corp Calendar")
-5. Save
+**Phase 1: Admin Setup (Entra Global Administrator required)**
 
-### 3. Each user authenticates once
+1. Go to **claude.ai → Organization Settings → Connectors**
+2. Find **Microsoft 365** and click **Enable**
+3. Admin authenticates with their Microsoft account
+4. Grant tenant-wide consent for the connector
 
-Users click **Connect** on the integration. Their browser opens Microsoft's standard OAuth login. After signing in with their Microsoft account, the integration is live for that user — scoped to their Entra identity and existing M365 permissions.
+**Phase 2: User Setup (Each team member)**
 
----
+1. Go to **claude.ai → Settings → Connectors**
+2. Find **Microsoft 365** and click **Connect**
+3. Authenticate with their Microsoft account
+4. Done — Claude can now access their M365 data
 
-## Pairing With a Claude Project
+### What Gets Installed in Entra
 
-Create a Claude Project for the client with a system prompt that frames the experience:
+Two service principals are created in your tenant:
+- **M365 MCP Client** — The client application
+- **M365 MCP Server for Claude** — The server component
 
-```
-You are an AI assistant for [Company Name]. You have access to the company's 
-Microsoft 365 environment. When users ask about meetings, emails, documents, 
-or calendar availability, use the available Microsoft tools to retrieve live 
-data. Present answers in plain business language. Never expose raw JSON, 
-tool call details, or technical errors to the user — if something fails, 
-explain it simply and offer an alternative.
-```
+These are managed by Anthropic. You don't deploy or maintain anything.
 
----
-
-## Cost
+### Cost
 
 | Item | Cost |
-|---|---|
+|------|------|
 | Azure infrastructure | **$0** |
-| Microsoft licensing | Existing client licenses |
-| Claude Team plan | ~$25–30/user/month |
+| Microsoft licensing | Existing M365 licenses |
+| Claude Team/Enterprise | ~$25–30/user/month |
+
+### Security & Data Handling
+
+Per [Anthropic's security documentation](https://support.claude.com/en/articles/12684923-microsoft-365-connector-security-guide):
+- Documents remain in your Microsoft 365 tenant
+- Connector retrieves data on-demand during active queries
+- No file content is cached
+- User-scoped access — Claude sees only what each user can access
+
+### When to Use Option 1A
+
+✅ Client only needs email, calendar, SharePoint, Teams, OneDrive access
+✅ Fastest possible setup (under 1 hour)
+✅ No Azure infrastructure to manage
+✅ Read-only access is sufficient
+
+### Limitations
+
+❌ No access to Dynamics 365, Azure resources, Power Platform, or custom systems
+❌ Cannot write/modify data (read-only)
+❌ Limited to the specific M365 services Anthropic supports
+❌ Less control over security policies (managed by Anthropic)
 
 ---
 
-## Limitations
+## Option 1B: Microsoft Work IQ MCP Servers (Preview)
 
-- No access to Dynamics 365, Azure resources, or custom internal systems (requires self-hosted deployment)
-- Power Platform endpoint requires Power Platform environment setup
-- M365 endpoints require appropriate Graph API permissions granted in the client's tenant
-- Read-only for most operations (write actions depend on the specific server's tool set)
+**Cloud-hosted by Microsoft, but requires M365 Copilot license and additional setup.**
+
+Microsoft provides cloud-hosted MCP servers under the "Work IQ" brand. These are real MCP endpoints hosted at `agent365.svc.cloud.microsoft`, but they're designed primarily for Microsoft Copilot Studio and Azure AI Foundry — not directly for Claude.
+
+> ⚠️ **Important**: These servers require a **Microsoft 365 Copilot license** (~$30/user/month on top of M365). They are in **preview** and may change.
+
+### Available Work IQ Servers
+
+| Server | Endpoint Pattern | Capabilities |
+|--------|-----------------|--------------|
+| **Work IQ Mail** | `https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_MailTools` | Create, read, update, delete emails; semantic search |
+| **Work IQ Calendar** | `https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_CalendarTools` | Create, list, update events; resolve conflicts |
+| **Work IQ Teams** | `https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_TeamsServer` | Create chats, post messages, channel operations |
+| **Work IQ SharePoint** | `https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_SharePoint` | Upload files, get metadata, search, manage lists |
+| **Work IQ OneDrive** | `https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_OneDrive` | Manage files and folders |
+| **Work IQ User** | `https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_UserTools` | Get manager, direct reports, search users |
+| **Work IQ Word** | `https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_WordServer` | Create/read documents, add comments |
+
+### Requirements
+
+- **Microsoft 365 Copilot license** (required — not just regular M365)
+- **Claude Team or Enterprise plan**
+- Entra tenant admin access
+
+### Using with Claude (Experimental)
+
+These endpoints are designed for Copilot Studio and Foundry, not directly for Claude. To use them with Claude:
+
+1. **Direct connection (may work)**: Paste the endpoint URL into Claude's integration settings
+   - Replace `{tenant_id}` with your Entra tenant ID
+   - OAuth flow should work if Claude supports the authentication pattern
+   - **Status: Untested with Claude — your mileage may vary**
+
+2. **Via APIM proxy (more reliable)**: Use AzureConduit's self-hosted infrastructure to proxy requests
+   - Deploy APIM with the Terraform module
+   - Configure APIM to forward to the Work IQ endpoint
+   - This gives you logging, rate limiting, and token validation
+   - See [Option 2](./02-self-hosted-aca.md) for APIM setup
+
+### When to Use Option 1B
+
+✅ Client already has M365 Copilot licenses
+✅ Need write access (create emails, schedule meetings)
+✅ Want Microsoft-hosted infrastructure
+✅ Building agents in Copilot Studio or Foundry (primary use case)
+
+### Limitations
+
+❌ Requires M365 Copilot license (~$30/user/month extra)
+❌ Preview feature — may change
+❌ Designed for Copilot Studio, not Claude
+❌ Direct Claude integration is untested
+❌ No access to D365, Azure resources, or custom systems
+
+### Documentation
+
+- [Work IQ MCP overview (Microsoft Learn)](https://learn.microsoft.com/en-us/microsoft-agent-365/tooling-servers-overview)
+- [Microsoft MCP GitHub Repository](https://github.com/microsoft/mcp)
 
 ---
 
-## When to Use This Option
+## Other Cloud-Hosted Endpoints
 
-✅ Client is already on M365 and wants AI access to their email/calendar/docs
-✅ Fast proof of concept before committing to infrastructure
-✅ Client has budget sensitivity and existing Microsoft licensing
-❌ Client needs D365, custom Azure data, or internal LOB systems → use a self-hosted option
+These additional endpoints exist but have varying levels of Claude compatibility:
+
+| Endpoint | What It Accesses | Notes |
+|----------|------------------|-------|
+| **Microsoft Learn Docs** | `https://learn.microsoft.com/api/mcp` | Public documentation, no auth needed |
+| **Microsoft Foundry** | `https://mcp.ai.azure.com` | AI models, evaluation, datasets |
+| **GitHub Copilot** | `https://api.githubcopilot.com/mcp` | Repos, PRs, issues (requires GitHub Copilot) |
+| **MCP Server for Enterprise** | `https://mcp.svc.cloud.microsoft/enterprise` | Natural language queries for enterprise data |
+
+---
+
+## Decision: 1A vs 1B vs Self-Hosted
+
+| Factor | 1A: Anthropic Connector | 1B: Work IQ | Self-Hosted (02/03/04) |
+|--------|------------------------|-------------|------------------------|
+| **Setup time** | < 1 hour | 2-4 hours | 4-8 hours |
+| **Extra licensing** | None | M365 Copilot ($30/user) | None |
+| **Infrastructure** | None | None (or APIM proxy) | Terraform + Azure |
+| **M365 access** | ✅ Read-only | ✅ Read + Write | ✅ Read + Write |
+| **D365 access** | ❌ No | ❌ No | ✅ Yes |
+| **Custom systems** | ❌ No | ❌ No | ✅ Yes |
+| **Data residency** | Anthropic-managed | Microsoft-managed | Your tenant |
+| **Audit control** | Limited | Microsoft Defender | Full (APIM + Log Analytics) |
+
+**Recommendation:**
+- **Most clients**: Start with **Option 1A** (Anthropic's connector) — it's free, fast, and works
+- **Copilot licensees building agents**: Consider **Option 1B** for write capabilities
+- **D365, Azure, or custom systems**: Skip to **[Option 2 (Container Apps)](./02-self-hosted-aca.md)**
 
 ---
 
 ## Example Client Scenarios
 
-**Use this option when the client says:**
+### → Use Option 1A (Anthropic Connector)
 
 > *"We just want Claude to help with email and calendar — find meetings, summarize threads, check availability."*
 
-A 200-person marketing agency on M365 Business Premium. They want Claude to answer "What's on my calendar tomorrow?" and "Summarize the email thread with Acme Corp." No custom systems, no compliance concerns. **Setup: 2 hours. Cost: $0 infrastructure.**
+A 200-person marketing agency on M365 Business Premium. They want Claude to answer "What's on my calendar tomorrow?" and "Summarize the email thread with Acme Corp." **Setup: 30 minutes. Cost: $0 infrastructure.**
 
 ---
 
 > *"Can we try this out before we commit to deploying anything in Azure?"*
 
-A potential client wants a proof-of-concept. You set up Cloud-Hosted M365 endpoints in an afternoon. They see value, then you propose a full Container Apps deployment for D365 access later. **This option de-risks the sales conversation.**
+A potential client wants a proof-of-concept. Enable Anthropic's M365 connector in an hour. They see value, then you propose self-hosted deployment for D365 access later. **This option de-risks the sales conversation.**
 
 ---
 
-> *"We use Power Platform heavily — Power Apps, Power Automate, Dataverse."*
+### → Use Option 1B (Work IQ) or Skip to Self-Hosted
 
-A client with a citizen-developer culture building internal apps on Power Platform. The Power Platform MCP gives Claude access to 1,470+ connector actions. **No custom code, no infrastructure.**
+> *"We already pay for M365 Copilot and want Claude to be able to schedule meetings and send emails."*
+
+They need write access. If they have Copilot licenses, try Work IQ. Otherwise, self-host with custom MCP server.
 
 ---
 
-**Don't use this option when:**
+### → Skip to Self-Hosted (Option 2+)
 
 > *"We need Claude to access Dynamics 365 Finance to check purchase orders."*
 
-D365 F&O is not available via cloud-hosted MCPs. → Use [Option 2 (Container Apps)](./02-self-hosted-aca.md).
+D365 F&O is not available via any cloud-hosted option. → Use [Option 2 (Container Apps)](./02-self-hosted-aca.md).
 
-> *"Our compliance team won't allow data to flow through Microsoft's hosted endpoints."*
+> *"Our compliance team won't allow data to flow through Anthropic's or Microsoft's hosted endpoints."*
 
 Data residency or regulatory requirements. → Use [Option 2/3/4 (Self-Hosted)](./02-self-hosted-aca.md).
+
+> *"We use Salesforce, QuickBooks, Jira, or have on-prem SQL databases."*
+
+Non-Microsoft systems require custom MCP servers. → Use [Option 5 (Custom MCP)](./05-custom-mcp-server.md).
