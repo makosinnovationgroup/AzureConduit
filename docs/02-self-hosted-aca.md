@@ -15,17 +15,81 @@ Claude (claude.ai)
        ▼
 Azure API Management (Consumption)
        │  validates Entra JWT
-       │  strips token, injects managed identity credential
        ▼
 Azure Container Apps
   └─ MCP Server container
-       │  Managed Identity (no secrets)
+       │
        ▼
 Microsoft APIs (D365, Graph, Azure, Fabric, Sentinel...)
-       │  RBAC-scoped to authenticated user via OBO flow
+       │
        ▼
 Response → Claude → Plain English answer
 ```
+
+---
+
+## User Identity Options (Critical Decision)
+
+> ⚠️ **Important**: How downstream APIs authenticate determines whether users see only their own data or shared data. Choose carefully based on security requirements.
+
+### Option A: Managed Identity (Shared Access)
+
+**Default in current Terraform.** All API calls use the same service principal.
+
+| Aspect | Details |
+|--------|---------|
+| **How it works** | MCP server uses its Managed Identity to call downstream APIs |
+| **User context** | ❌ No — all users share the same access level |
+| **RBAC enforcement** | Based on Managed Identity's role assignments, not user's |
+| **Best for** | Non-sensitive data, internal tools, scenarios where all users should see the same data |
+
+```
+User A ─┐                    ┌─→ Managed Identity ─→ API (sees MI's data)
+User B ─┼─→ MCP Server ──────┤
+User C ─┘                    └─→ Same access for all users
+```
+
+### Option B: On-Behalf-Of Flow (User-Scoped Access)
+
+**Requires MCP server code changes.** Each API call uses the authenticated user's identity.
+
+| Aspect | Details |
+|--------|---------|
+| **How it works** | MCP server exchanges user's token for downstream API token via OBO |
+| **User context** | ✅ Yes — each user sees only their own data |
+| **RBAC enforcement** | Based on user's role assignments |
+| **Best for** | Sensitive data, multi-tenant scenarios, compliance requirements |
+
+```
+User A ─→ MCP Server ─→ OBO Exchange ─→ API (sees User A's data)
+User B ─→ MCP Server ─→ OBO Exchange ─→ API (sees User B's data)
+User C ─→ MCP Server ─→ OBO Exchange ─→ API (sees User C's data)
+```
+
+**Implementation status:** OBO is NOT built into Microsoft's MCP servers or the AzureConduit Terraform. See `prds/OBO_IMPLEMENTATION.md` for implementation guide.
+
+### Option C: OAuth Identity Passthrough (Microsoft Foundry Only)
+
+**Available only when using Microsoft Foundry Agent Service** as the orchestration layer.
+
+| Aspect | Details |
+|--------|---------|
+| **How it works** | User signs in via OAuth, Foundry stores their tokens per-user |
+| **User context** | ✅ Yes — each user sees only their own data |
+| **RBAC enforcement** | Based on user's role assignments |
+| **Best for** | Clients already using Foundry/Copilot Studio |
+
+**Not available for direct Claude-to-MCP connections.** Requires Microsoft Foundry as intermediary.
+
+### Decision Matrix
+
+| Requirement | Use Managed Identity | Use OBO | Use Foundry |
+|-------------|---------------------|---------|-------------|
+| All users see same data | ✅ | ✅ | ✅ |
+| Users see only their own data | ❌ | ✅ | ✅ |
+| No code changes needed | ✅ | ❌ | ✅ |
+| Works with Claude directly | ✅ | ✅ | ❌ |
+| Compliance/audit per-user | ❌ | ✅ | ✅ |
 
 ---
 
@@ -38,8 +102,9 @@ Response → Claude → Plain English answer
 | Azure API Management | OAuth gateway + policies | Consumption | ~$3.50/10k calls |
 | Entra App Registration | OAuth identity for the MCP server | Free | $0 |
 | User-Assigned Managed Identity | Secretless auth to Azure services | Free | $0 |
-| Azure Key Vault | Secrets if needed | Standard | ~$5 |
+| Azure Key Vault | Secrets (including OBO client secret if used) | Standard | ~$5 |
 | Log Analytics Workspace | Logging + diagnostics | Pay-per-GB | ~$2–10 |
+| Application Insights | APIM request tracing | Pay-per-GB | ~$2–5 |
 | **Total** | | | **~$15–50/mo** |
 
 *ACR (Azure Container Registry) adds ~$5/mo if using private images.*
@@ -48,17 +113,23 @@ Response → Claude → Plain English answer
 
 ## Key Technical Decisions
 
-### Secretless via Managed Identity
-The Container App is assigned a User-Assigned Managed Identity. When calling Microsoft Graph, D365, or other Azure APIs on behalf of a user, it uses the **On-Behalf-Of (OBO) flow** — the user's Entra token is exchanged for a downstream token that carries their identity and permissions. No client secrets are stored anywhere in the deployment.
+### APIM as the Security Gateway
 
-### Scale to Zero
-When no users are actively querying Claude, the Container App scales to zero instances. First-call latency after idle is typically 2–5 seconds — acceptable for the conversational use case. For clients requiring sub-second response on every call, set `min_replicas = 1`.
-
-### APIM as the Public Face
 The Container App's FQDN is never shared with users or Claude. All traffic goes through APIM, which enforces token validation via the `validate-azure-ad-token` policy. This means:
 - Invalid/expired tokens are rejected before hitting the MCP server
-- The MCP server implementation doesn't need to handle auth logic
-- Rate limiting, logging, and future policy changes are centralized
+- Rate limiting, logging, and policy enforcement are centralized
+- User identity is validated at the gateway
+
+### Managed Identity for Infrastructure
+
+The Container App is assigned a User-Assigned Managed Identity for:
+- Pulling images from Azure Container Registry (if used)
+- Reading secrets from Key Vault
+- **Optionally** calling downstream APIs (if using shared access model)
+
+### Scale to Zero
+
+When no users are actively querying Claude, the Container App scales to zero instances. First-call latency after idle is typically 2–5 seconds — acceptable for the conversational use case. For clients requiring sub-second response on every call, set `min_replicas = 1`.
 
 ---
 
@@ -81,7 +152,7 @@ module "azureconduit" {
   tenant_id            = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   subscription_id      = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   compute_type         = "container_apps"
-  mcp_image            = "ghcr.io/microsoft/mcp-azure:latest"
+  mcp_image            = "mcr.microsoft.com/azure-mcp:latest"
   apim_tier            = "Consumption"
   use_acr              = false
   claude_client_id     = "your-claude-enterprise-client-id"
@@ -119,33 +190,42 @@ Use one of Microsoft's official MCP server container images:
 
 | MCP Server | Container Image | What It Accesses |
 |---|---|---|
-| **Azure MCP** | `mcr.microsoft.com/azure-mcp:latest` | All Azure services (15+ tools) |
-| **Dynamics 365 ERP** | `mcr.microsoft.com/d365-mcp:latest` | D365 Finance, SCM, business actions |
-| **Microsoft Fabric** | `mcr.microsoft.com/fabric-mcp:latest` | Data warehouses, lakehouses, analytics |
-| **Dataverse** | `mcr.microsoft.com/dataverse-mcp:latest` | Power Platform business data |
+| **Azure MCP** | See [github.com/Azure/azure-mcp](https://github.com/Azure/azure-mcp) | All Azure services (15+ tools) |
+| **Dynamics 365 ERP** | Check [github.com/microsoft/mcp](https://github.com/microsoft/mcp) | D365 Finance, SCM, business actions |
+| **Microsoft Fabric** | Check [github.com/microsoft/mcp](https://github.com/microsoft/mcp) | Data warehouses, lakehouses, analytics |
+| **Dataverse** | Check [github.com/microsoft/mcp](https://github.com/microsoft/mcp) | Power Platform business data |
 
-*Verify current images at [github.com/microsoft/mcp](https://github.com/microsoft/mcp)*
+> ⚠️ **Note**: Microsoft's official MCP servers use Managed Identity or the caller's direct credentials — they do NOT implement OBO out of the box. If user-scoped access is required, you'll need custom MCP server code. See `prds/OBO_IMPLEMENTATION.md`.
 
-Set your chosen image in Terraform:
-```hcl
-mcp_image = "mcr.microsoft.com/azure-mcp:latest"
-```
+*Verify current images at [github.com/microsoft/mcp](https://github.com/microsoft/mcp) and [github.com/Azure/azure-mcp](https://github.com/Azure/azure-mcp)*
 
 ---
 
 ## Permissions Required
 
-The MCP server connects to Microsoft APIs using the user's identity (OBO flow). Grant permissions in the client's tenant:
+### If Using Managed Identity (Shared Access)
 
-| Target System | Required Permission |
+Grant the Managed Identity access in the client's tenant:
+
+| Target System | Required Permission for Managed Identity |
 |---|---|
-| Dynamics 365 Finance/SCM | D365 RBAC role (e.g. System User) |
-| Microsoft 365 (email, calendar) | Graph API delegated permissions |
-| Azure resources (storage, databases) | Azure RBAC Reader or higher |
+| Dynamics 365 Finance/SCM | D365 Application User with appropriate security role |
+| Microsoft Graph | Application permissions (e.g., `User.Read.All`) |
+| Azure resources | Azure RBAC role (e.g., Reader) on target resources |
 | Microsoft Fabric | Fabric Workspace Member or higher |
-| Microsoft Sentinel | Sentinel Reader |
 
-All permissions are granted in the client's tenant — AzureConduit infrastructure never holds standing access.
+### If Using OBO (User-Scoped Access)
+
+Grant **delegated permissions** to the Entra App Registration:
+
+| Target System | Required Delegated Permission |
+|---|---|
+| Dynamics 365 Finance/SCM | `user_impersonation` on D365 |
+| Microsoft Graph | Delegated permissions (e.g., `User.Read`, `Mail.Read`) |
+| Azure resources | User must have Azure RBAC roles; app needs `user_impersonation` |
+| Microsoft Fabric | Delegated permissions on Fabric API |
+
+Additionally, add a **client secret or certificate** to the app registration for OBO token exchange.
 
 ---
 
@@ -169,6 +249,8 @@ All permissions are granted in the client's tenant — AzureConduit infrastructu
 
 A mid-size manufacturer (500 employees) running D365 F&O. Their AP team wants to ask "What invoices are due this week?" and "Show me POs over $50k awaiting approval." D365 requires self-hosted infrastructure. **This is the default production choice.**
 
+**Identity consideration:** If different users should see different D365 data based on their security roles, implement OBO. If all users can see all data, Managed Identity is simpler.
+
 ---
 
 > *"Our compliance team requires all data to stay within our Azure tenant."*
@@ -186,6 +268,8 @@ A consulting firm deploying Claude to their analysts. Regular daily usage justif
 > *"We need to log every API call for audit purposes and rate-limit by user."*
 
 A regulated industry client (healthcare, finance) requiring detailed audit trails. APIM provides centralized logging, rate limiting, and policy enforcement before requests hit the MCP server.
+
+**Identity consideration:** For per-user audit trails to be meaningful, consider implementing OBO so logs show which user accessed which data.
 
 ---
 

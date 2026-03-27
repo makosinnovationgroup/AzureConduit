@@ -56,6 +56,16 @@
 ### Plain English (for slide)
 > "The MCP server never has standing access to your data. When a user asks Claude a question, the server exchanges their token for a downstream token that carries their identity and their permissions. Claude only sees what that specific user is allowed to see — nothing more."
 
+> ⚠️ **Important Implementation Note:** OBO is NOT built into Microsoft's official MCP servers (Azure MCP, D365 MCP, Fabric MCP). These servers use Managed Identity by default, meaning all users share the same access level. OBO requires **custom MCP server code** — see `prds/OBO_IMPLEMENTATION.md` for implementation guide.
+
+### Identity Options Comparison
+
+| Approach | User-Scoped Access | Built-in | Requires |
+|----------|-------------------|----------|----------|
+| **Managed Identity** (default) | ❌ No — all users share same access | ✅ Yes | Nothing extra |
+| **OBO Flow** | ✅ Yes — each user's permissions | ❌ No | Custom MCP server code |
+| **OAuth Identity Passthrough** | ✅ Yes — each user's permissions | ✅ Yes (Foundry only) | Microsoft Foundry Agent Service |
+
 ### Technical Proof Points
 
 **How OBO Token Exchange Works:**
@@ -406,7 +416,7 @@ User Query → Claude (Anthropic) → APIM (Your Tenant) → MCP Server (Your Te
 
 ## Key Talking Points for CTO
 
-1. **"No standing access"** — MCP server uses OBO flow; no stored credentials or persistent API access.
+1. **"No standing access"** — With OBO flow implementation, MCP server exchanges user tokens for downstream access; no stored credentials or persistent API access. *(Note: Requires custom MCP server code — not built into Microsoft's official MCPs.)*
 
 2. **"Your controls, your policies"** — Existing Conditional Access, RBAC, and audit infrastructure applies automatically.
 
@@ -417,3 +427,5 @@ User Query → Claude (Anthropic) → APIM (Your Tenant) → MCP Server (Your Te
 5. **"Audit-ready"** — Every authentication and API call logged; maps directly to SOC 2/ISO 27001 controls.
 
 6. **"Defense in depth"** — APIM validates before MCP server sees the request; RBAC enforced at every downstream API.
+
+7. **"Identity options"** — Choose between shared Managed Identity (simpler) or user-scoped OBO (more secure) based on data sensitivity requirements.

@@ -21,6 +21,26 @@ The current AzureConduit infrastructure validates user tokens at the APIM gatewa
 - User-specific RBAC is not enforced at the downstream API level
 - The MCP server has standing access to resources, not user-scoped access
 
+### Why Not Use Microsoft's Official MCP Servers?
+Microsoft's official MCP servers (Azure MCP, D365 MCP, Fabric MCP, Dataverse MCP) do **NOT** implement OBO out of the box. They are designed to use:
+1. **Managed Identity** — for self-hosted deployments (all users share same access)
+2. **OAuth Identity Passthrough** — only available when using Microsoft Foundry Agent Service as the orchestration layer
+
+For direct Claude-to-MCP connections with user-scoped access, **OBO must be implemented in custom MCP server code**.
+
+### Alternative: OAuth Identity Passthrough (Foundry Only)
+If the client is willing to use Microsoft Foundry Agent Service as the intermediary (instead of direct Claude-to-MCP), they can leverage OAuth Identity Passthrough:
+
+| Aspect | OBO (Custom MCP) | OAuth Identity Passthrough (Foundry) |
+|--------|------------------|--------------------------------------|
+| **How it works** | MCP server exchanges user token for downstream token | Foundry stores user tokens per-user, passes to MCP |
+| **Requires** | Custom MCP server code + client credentials | Microsoft Foundry Agent Service |
+| **Works with Claude directly** | ✅ Yes | ❌ No — requires Foundry as intermediary |
+| **Implementation effort** | Medium (code + Terraform changes) | Low (configuration only) |
+| **Best for** | Direct Claude integration, full control | Clients already using Copilot Studio/Foundry |
+
+See [Microsoft Foundry MCP documentation](https://learn.microsoft.com/en-us/azure/ai-foundry/mcp/) for OAuth Identity Passthrough details.
+
 ### Desired State
 The MCP server should exchange the user's token for a downstream API token that:
 - Carries the user's identity (UPN, OID, groups)
