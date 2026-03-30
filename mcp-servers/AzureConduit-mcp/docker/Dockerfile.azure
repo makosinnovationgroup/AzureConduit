@@ -1,0 +1,60 @@
+# AzureConduit Azure MCP Server
+# Multi-stage build for optimized production image
+
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy solution and project files
+COPY ["AzureConduit.Mcp.sln", "."]
+COPY ["Directory.Build.props", "."]
+COPY ["Directory.Packages.props", "."]
+COPY ["src/AzureConduit.Mcp.Core/AzureConduit.Mcp.Core.csproj", "src/AzureConduit.Mcp.Core/"]
+COPY ["src/AzureConduit.Mcp.Azure/AzureConduit.Mcp.Azure.csproj", "src/AzureConduit.Mcp.Azure/"]
+
+# Restore dependencies
+RUN dotnet restore "src/AzureConduit.Mcp.Azure/AzureConduit.Mcp.Azure.csproj"
+
+# Copy source code
+COPY ["src/AzureConduit.Mcp.Core/", "src/AzureConduit.Mcp.Core/"]
+COPY ["src/AzureConduit.Mcp.Azure/", "src/AzureConduit.Mcp.Azure/"]
+
+# Build
+WORKDIR "/src/src/AzureConduit.Mcp.Azure"
+RUN dotnet build "AzureConduit.Mcp.Azure.csproj" -c Release -o /app/build
+
+# Publish stage
+FROM build AS publish
+RUN dotnet publish "AzureConduit.Mcp.Azure.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+WORKDIR /app
+
+# Create non-root user for security
+RUN adduser --disabled-password --gecos "" --uid 1000 appuser
+USER appuser
+
+# Copy published app
+COPY --from=publish /app/publish .
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Expose port
+EXPOSE 8080
+
+# Set environment variables
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV DOTNET_RUNNING_IN_CONTAINER=true
+
+# Entry point
+ENTRYPOINT ["dotnet", "AzureConduit.Mcp.Azure.dll"]
+
+# Labels
+LABEL org.opencontainers.image.title="AzureConduit Azure MCP"
+LABEL org.opencontainers.image.description="Azure MCP Server with OBO authentication for user-scoped access"
+LABEL org.opencontainers.image.vendor="AzureConduit"
+LABEL org.opencontainers.image.version="1.0.0"

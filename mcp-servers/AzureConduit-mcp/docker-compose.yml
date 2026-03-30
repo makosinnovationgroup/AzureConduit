@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  azure-mcp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.azure
+    image: azureconduit/mcp-azure:latest
+    container_name: azureconduit-mcp-azure
+    ports:
+      - "8081:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Obo__TenantId=${OBO_TENANT_ID}
+      - Obo__ClientId=${OBO_CLIENT_ID}
+      - Obo__ClientSecret=${OBO_CLIENT_SECRET}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  d365-mcp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.d365
+    image: azureconduit/mcp-d365:latest
+    container_name: azureconduit-mcp-d365
+    ports:
+      - "8082:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Obo__TenantId=${OBO_TENANT_ID}
+      - Obo__ClientId=${OBO_CLIENT_ID}
+      - Obo__ClientSecret=${OBO_CLIENT_SECRET}
+      - D365__EnvironmentUrl=${D365_ENVIRONMENT_URL}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  dataverse-mcp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dataverse
+    image: azureconduit/mcp-dataverse:latest
+    container_name: azureconduit-mcp-dataverse
+    ports:
+      - "8083:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Obo__TenantId=${OBO_TENANT_ID}
+      - Obo__ClientId=${OBO_CLIENT_ID}
+      - Obo__ClientSecret=${OBO_CLIENT_SECRET}
+      - Dataverse__EnvironmentUrl=${DATAVERSE_ENVIRONMENT_URL}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  fabric-mcp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.fabric
+    image: azureconduit/mcp-fabric:latest
+    container_name: azureconduit-mcp-fabric
+    ports:
+      - "8084:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Obo__TenantId=${OBO_TENANT_ID}
+      - Obo__ClientId=${OBO_CLIENT_ID}
+      - Obo__ClientSecret=${OBO_CLIENT_SECRET}
+      - Fabric__DefaultCapacityId=${FABRIC_CAPACITY_ID}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  default:
+    name: azureconduit-mcp

@@ -1,0 +1,45 @@
+# AzureConduit D365 MCP Server
+# Multi-stage build for optimized production image
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY ["AzureConduit.Mcp.sln", "."]
+COPY ["Directory.Build.props", "."]
+COPY ["Directory.Packages.props", "."]
+COPY ["src/AzureConduit.Mcp.Core/AzureConduit.Mcp.Core.csproj", "src/AzureConduit.Mcp.Core/"]
+COPY ["src/AzureConduit.Mcp.D365/AzureConduit.Mcp.D365.csproj", "src/AzureConduit.Mcp.D365/"]
+
+RUN dotnet restore "src/AzureConduit.Mcp.D365/AzureConduit.Mcp.D365.csproj"
+
+COPY ["src/AzureConduit.Mcp.Core/", "src/AzureConduit.Mcp.Core/"]
+COPY ["src/AzureConduit.Mcp.D365/", "src/AzureConduit.Mcp.D365/"]
+
+WORKDIR "/src/src/AzureConduit.Mcp.D365"
+RUN dotnet build "AzureConduit.Mcp.D365.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "AzureConduit.Mcp.D365.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+WORKDIR /app
+
+RUN adduser --disabled-password --gecos "" --uid 1000 appuser
+USER appuser
+
+COPY --from=publish /app/publish .
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+EXPOSE 8080
+
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+ENTRYPOINT ["dotnet", "AzureConduit.Mcp.D365.dll"]
+
+LABEL org.opencontainers.image.title="AzureConduit D365 MCP"
+LABEL org.opencontainers.image.description="Dynamics 365 MCP Server with OBO authentication"
+LABEL org.opencontainers.image.vendor="AzureConduit"
+LABEL org.opencontainers.image.version="1.0.0"
