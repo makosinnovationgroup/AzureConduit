@@ -52,10 +52,11 @@ What systems does the client want Claude to access?
 |------------------|--------|--------------|-----------------|-------------|
 | M365 only, read-only access | 1A: Anthropic Connector | ❌ None | ❌ None | ❌ None |
 | M365 only, write access, has Copilot | 1B: Work IQ (preview) | ❌ None | ✅ M365 Copilot | ❌ None |
-| D365, Azure, Fabric, Sentinel | Self-Hosted (02/03/04) | ✅ Terraform | ❌ None | ❌ None |
-| Must stay in their Azure tenant | Self-Hosted (02/03/04) | ✅ Terraform | ❌ None | ❌ None |
+| D365, Azure, Fabric, Dataverse with user-scoped access | **6: AzureConduit-mcp** ⭐ | ✅ Terraform | ❌ None | ❌ None |
+| D365, Azure, Fabric (shared service identity) | Self-Hosted (02/03/04) | ✅ Terraform | ❌ None | ❌ None |
+| Must stay in their Azure tenant | Self-Hosted (02/03/04) or 6 | ✅ Terraform | ❌ None | ❌ None |
 | Non-Microsoft systems (Salesforce, etc.) | Custom MCP (05) | ✅ Terraform | ❌ None | ✅ MCP server |
-| Hybrid — Microsoft + other systems | Custom MCP (05) | ✅ Terraform | ❌ None | ✅ MCP server |
+| Hybrid — Microsoft + other systems | Custom MCP (05) + 6 | ✅ Terraform | ❌ None | ✅ MCP server |
 
 ---
 
@@ -89,9 +90,28 @@ What systems does the client want Claude to access?
 
 ---
 
-## Options 2/3/4: Self-Hosted Microsoft MCP Server
+## Option 6: AzureConduit-mcp (OBO-Enabled) ⭐ Recommended
+
+**117 tools with On-Behalf-Of authentication — each user sees only what their AD roles permit.**
+
+| MCP Server | Tools | Capabilities |
+|------------|-------|--------------|
+| **Azure** | 42 | Subscriptions, Storage, Key Vault, Cosmos DB, SQL, AKS, Functions, Event Hubs, Service Bus, Monitor, Redis, Container Registry, Policy, Network, Container Apps |
+| **D365** | 34 | Generic Data tools, Action invocation, Form automation, Finance, Supply Chain |
+| **Dataverse** | 13 | Tables, Records, Schema management, FetchXML, Search |
+| **Fabric** | 28 | Workspaces, Lakehouses, Warehouses, Pipelines, OneLake file operations |
+
+**Key difference from Microsoft's servers**: AzureConduit-mcp uses OBO token exchange so each API call carries the user's identity. Microsoft's servers use Managed Identity (shared access for all users).
+
+➡️ **[Setup Guide](./06-azureconduit-mcp-setup.md)**
+
+---
+
+## Options 2/3/4: Self-Hosted Microsoft MCP Server (Shared Identity)
 
 Deploy Microsoft's official MCP server images in the client's Azure tenant.
+
+> ⚠️ **Note**: Microsoft's servers use Managed Identity, meaning all users share the same access level. For user-scoped access with RBAC enforcement, use **Option 6: AzureConduit-mcp** instead.
 
 ### Available Microsoft MCP Server Images
 
@@ -182,6 +202,7 @@ Use these to route quickly:
 |--------|------------|---------------------|
 | 1A: Anthropic Connector | < 1 hour | None |
 | 1B: Work IQ (Preview) | 2–4 hours | Minimal |
+| **6: AzureConduit-mcp (OBO)** ⭐ | **4–8 hours** | **Low (Terraform managed)** |
 | Self-Hosted Microsoft MCP (02/03/04) | 4–8 hours | Low (Terraform managed) |
 | Custom MCP Server (05) | 2–5 days | Medium (server code to maintain) |
 
@@ -226,10 +247,27 @@ Use these to route quickly:
 - **"Response time is critical — we can't have any cold start delays."**
   Always-on compute.
 
+### → Use [Option 6: AzureConduit-mcp](./06-azureconduit-mcp-setup.md) ⭐ Recommended for Microsoft
+
+- **"We need Claude to pull data from D365, but only show each user their permitted data."**
+  User-scoped OBO authentication. Finance sees finance data, sales sees sales data.
+
+- **"We have Azure infrastructure and want Claude to help manage it securely."**
+  42 Azure tools with user RBAC enforced.
+
+- **"We use Dataverse/Power Platform and need full CRUD plus schema management."**
+  13 Dataverse tools including table creation.
+
+- **"We use Fabric for analytics and need to manage lakehouses and pipelines."**
+  28 Fabric tools including OneLake file operations.
+
+- **"We need Conditional Access policies (MFA, device compliance) to apply."**
+  OBO propagates CA policies to downstream APIs.
+
 ### → Use [Option 5: Custom MCP Server](./05-custom-mcp-server.md)
 
 - **"We use Salesforce for CRM and D365 for finance."**
-  Hybrid Microsoft + non-Microsoft.
+  Hybrid Microsoft + non-Microsoft. Use Option 5 for Salesforce + Option 6 for D365.
 
 - **"Our main database is an on-prem SQL Server."**
   On-premises data source.

@@ -77,6 +77,19 @@ Per [Anthropic's security documentation](https://support.claude.com/en/articles/
 ❌ Limited to the specific M365 services Anthropic supports
 ❌ Less control over security policies (managed by Anthropic)
 
+### Need D365, Azure, Dataverse, or Fabric?
+
+Use **AzureConduit-mcp** — our OBO-enabled MCP servers that provide 117 tools for Microsoft services with user-scoped authentication:
+
+| MCP Server | Tools | Use Case |
+|------------|-------|----------|
+| Azure | 42 | Infrastructure management, Key Vault, Cosmos DB, AKS, etc. |
+| D365 | 34 | Finance & Operations with Data/Action/Form tools |
+| Dataverse | 13 | Power Platform tables, records, schema management |
+| Fabric | 28 | Lakehouses, Warehouses, Pipelines, OneLake files |
+
+➡️ **[AzureConduit-mcp Setup Guide](./06-azureconduit-mcp-setup.md)**
+
 ---
 
 ## Option 1B: Microsoft Work IQ MCP Servers (Preview)

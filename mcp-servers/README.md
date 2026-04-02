@@ -1,8 +1,31 @@
 # AzureConduit MCP Server Library
 
-**19 pre-built MCP servers ready to deploy with AzureConduit.**
+**20 pre-built MCP servers with 117+ tools ready to deploy with AzureConduit.**
 
 This library provides production-ready MCP (Model Context Protocol) servers for common business systems. Each server can be deployed to Azure Container Apps using the AzureConduit Terraform module, giving Claude access to your business data through natural language.
+
+---
+
+## ⭐ Microsoft MCP Servers with OBO Authentication
+
+The **AzureConduit-mcp** mono-repo provides 117 tools for Microsoft services with **On-Behalf-Of (OBO) authentication** — each user sees only what their AD roles permit.
+
+| Server | Tools | Description |
+|--------|-------|-------------|
+| [**AzureConduit-mcp**](./AzureConduit-mcp) | **117** | Azure, D365, Dataverse, Fabric with user-scoped OBO auth |
+
+### What's Inside AzureConduit-mcp
+
+| MCP Server | Tools | Capabilities |
+|------------|-------|--------------|
+| **Azure** | 42 | 19 service categories: Subscriptions, Storage, Key Vault, Compute, Cosmos DB, SQL, App Service, AKS, Functions, Event Hubs, Service Bus, Monitor, Redis, ACR, Policy, Network, Container Apps |
+| **D365** | 34 | Generic Data tools (6), Action tools (2), Form automation (13), plus legacy Finance/SCM tools |
+| **Dataverse** | 13 | Full CRUD for tables/records, schema management, FetchXML queries, Search API |
+| **Fabric** | 28 | Workspaces, Lakehouses, Warehouses, Notebooks, Pipelines, OneLake file ops, API docs |
+
+**Key Feature**: Each MCP server is independently deployable. Deploy only Azure for infra teams, only D365 for finance, etc.
+
+➡️ **[Setup Guide](../docs/06-azureconduit-mcp-setup.md)** | **[Full Documentation](./AzureConduit-mcp/README.md)**
 
 ---
 

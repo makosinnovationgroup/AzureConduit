@@ -1,9 +1,27 @@
 # PRD: On-Behalf-Of (OBO) Flow Implementation for AzureConduit MCP Servers
 
-**Version:** 1.0
-**Status:** Draft
+**Version:** 1.1
+**Status:** ✅ Implemented
 **Author:** AzureConduit Team
-**Last Updated:** 2024
+**Last Updated:** 2026-03-27
+
+---
+
+## Implementation Status
+
+OBO authentication has been fully implemented in **`mcp-servers/AzureConduit-mcp/`**:
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| OBO Core Library | ✅ Complete | `src/AzureConduit.Mcp.Core/` |
+| Azure MCP (42 tools) | ✅ Complete | `src/AzureConduit.Mcp.Azure/` |
+| D365 MCP (34 tools) | ✅ Complete | `src/AzureConduit.Mcp.D365/` |
+| Dataverse MCP (13 tools) | ✅ Complete | `src/AzureConduit.Mcp.Dataverse/` |
+| Fabric MCP (28 tools) | ✅ Complete | `src/AzureConduit.Mcp.Fabric/` |
+
+**Total: 117 tools** with user-scoped OBO authentication.
+
+➡️ **[Setup Guide](../docs/06-azureconduit-mcp-setup.md)** | **[Full Documentation](../mcp-servers/AzureConduit-mcp/README.md)**
 
 ---
 
